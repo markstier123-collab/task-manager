@@ -1,62 +1,100 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { useMemo, useState } from 'react';
+import { FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { AddTaskRow } from '@/components/task-manager/add-task-row';
+import { FilterPills } from '@/components/task-manager/filter-pills';
+import { Header } from '@/components/task-manager/header';
+import { ListDrawer } from '@/components/task-manager/list-drawer';
+import { NewListModal } from '@/components/task-manager/new-list-modal';
+import { TaskCard } from '@/components/task-manager/task-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTaskManager } from '@/hooks/use-task-manager';
+import { filterTasks, sortTasks } from '@/lib/task-utils';
+import { DueFilter, StatusFilter } from '@/lib/types';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+export default function TaskManagerScreen() {
+  const { loading, lists, currentList, createList, switchList, addTask, updateTask, setTaskStatus } =
+    useTaskManager();
 
-export default function HomeScreen() {
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [newListVisible, setNewListVisible] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [dueFilter, setDueFilter] = useState<DueFilter>('anytime');
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+
+  const visibleTasks = useMemo(() => {
+    if (!currentList) return [];
+    return sortTasks(filterTasks(currentList.tasks, statusFilter, dueFilter));
+  }, [currentList, statusFilter, dueFilter]);
+
+  if (loading || !currentList) {
+    return <ThemedView style={styles.container} />;
+  }
+
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <ThemedView style={styles.content}>
+          <Header
+            listName={currentList.name}
+            onOpenDrawer={() => setDrawerVisible(true)}
+            onNewList={() => setNewListVisible(true)}
           />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
+
+          <AddTaskRow onAdd={addTask} />
+
+          <FilterPills
+            statusFilter={statusFilter}
+            dueFilter={dueFilter}
+            onStatusFilterChange={setStatusFilter}
+            onDueFilterChange={setDueFilter}
+          />
+
+          <FlatList
+            data={visibleTasks}
+            keyExtractor={(task) => task.id}
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TaskCard
+                task={item}
+                allTasks={currentList.tasks}
+                expanded={expandedTaskId === item.id}
+                onToggleExpand={() =>
+                  setExpandedTaskId((prev) => (prev === item.id ? null : item.id))
+                }
+                onUpdate={(patch) => updateTask(item.id, patch)}
+                onStatusChange={(status) => setTaskStatus(item.id, status)}
+              />
+            )}
+            ListEmptyComponent={
+              <ThemedText themeColor="textSecondary" style={styles.emptyText}>
+                {currentList.tasks.length === 0
+                  ? 'No tasks yet — add one above.'
+                  : 'No tasks match these filters.'}
+              </ThemedText>
+            }
           />
         </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
       </SafeAreaView>
+
+      <ListDrawer
+        visible={drawerVisible}
+        lists={lists}
+        currentListId={currentList.id}
+        onSelect={switchList}
+        onClose={() => setDrawerVisible(false)}
+      />
+
+      <NewListModal
+        visible={newListVisible}
+        onCreate={createList}
+        onClose={() => setNewListVisible(false)}
+      />
     </ThemedView>
   );
 }
@@ -64,35 +102,28 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
     alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
   },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  content: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
+    width: '100%',
+    maxWidth: MaxContentWidth,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+    paddingTop: Spacing.two,
+    gap: Spacing.three,
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    gap: Spacing.two,
+    paddingBottom: Spacing.five,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: Spacing.five,
   },
 });
