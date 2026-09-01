@@ -4,6 +4,7 @@ import { buildImportedTasks, ImportTarget } from '@/lib/csv';
 import { generateId } from '@/lib/id';
 import { createSeedList } from '@/lib/seed-data';
 import { loadState, saveState } from '@/lib/storage';
+import { syncTaskToServer } from '@/lib/task-sync';
 import { applyStatusChange, createDefaultStatuses } from '@/lib/task-utils';
 import {
   CustomFieldDef,
@@ -108,7 +109,7 @@ export function useTaskManager() {
   );
 
   const addTask = useCallback(
-    (label: string) => {
+    (label: string, details?: Partial<Task>) => {
       const trimmed = label.trim();
       if (!trimmed) return;
       updateCurrentList((list) => {
@@ -118,7 +119,9 @@ export function useTaskManager() {
           label: trimmed,
           status: defaultStatus,
           createdAt: Date.now(),
+          ...details,
         };
+        syncTaskToServer(task);
         return { ...list, tasks: [...list.tasks, task] };
       });
     },
@@ -128,7 +131,12 @@ export function useTaskManager() {
   const updateTask = useCallback(
     (taskId: string, patch: Partial<Task>) => {
       updateCurrentListTasks((tasks) =>
-        tasks.map((task) => (task.id === taskId ? { ...task, ...patch } : task)),
+        tasks.map((task) => {
+          if (task.id !== taskId) return task;
+          const next = { ...task, ...patch };
+          syncTaskToServer(next);
+          return next;
+        }),
       );
     },
     [updateCurrentListTasks],
@@ -137,7 +145,12 @@ export function useTaskManager() {
   const setTaskStatus = useCallback(
     (taskId: string, status: string) => {
       updateCurrentListTasks((tasks) =>
-        tasks.map((task) => (task.id === taskId ? applyStatusChange(task, status) : task)),
+        tasks.map((task) => {
+          if (task.id !== taskId) return task;
+          const next = applyStatusChange(task, status);
+          syncTaskToServer(next);
+          return next;
+        }),
       );
     },
     [updateCurrentListTasks],

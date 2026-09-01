@@ -11,7 +11,9 @@ import { ImportModal } from '@/components/task-manager/import-modal';
 import { ListDrawer } from '@/components/task-manager/list-drawer';
 import { ModalSheet } from '@/components/task-manager/modal-sheet';
 import { NewListModal } from '@/components/task-manager/new-list-modal';
+import { NewTaskModal } from '@/components/task-manager/new-task-modal';
 import { TaskCard } from '@/components/task-manager/task-card';
+import { TaskDraftLike } from '@/components/task-manager/task-details-form';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -25,6 +27,7 @@ import {
 import { useTaskManagerContext } from '@/context/task-manager-context';
 import { useTheme } from '@/hooks/use-theme';
 import { parseCsv, tasksToCsv } from '@/lib/csv';
+import { todayISODate } from '@/lib/date-utils';
 import { downloadCsv, pickCsvFileText } from '@/lib/file-io';
 import { groupTasks } from '@/lib/group-sort';
 import { filterTasks } from '@/lib/task-utils';
@@ -65,6 +68,7 @@ export default function TaskManagerScreen() {
   );
   const [importResult, setImportResult] = useState<number | null>(null);
   const [importAttemptId, setImportAttemptId] = useState(0);
+  const [newTaskDraft, setNewTaskDraft] = useState<TaskDraftLike | null>(null);
 
   // Falls back to 'all' if the selected status was deleted from the list's status set.
   const effectiveStatusFilter: StatusFilter =
@@ -115,6 +119,22 @@ export default function TaskManagerScreen() {
     setImportState({ header: parsed[0], rows: parsed.slice(1) });
   };
 
+  const handleStartAddTask = (label: string) => {
+    if (!currentList) return;
+    setNewTaskDraft({
+      label,
+      status: currentList.statuses[0]?.id ?? 'not_started',
+      estimatedDate: todayISODate(),
+    });
+  };
+
+  const handleConfirmNewTask = () => {
+    if (!newTaskDraft) return;
+    const { label, ...details } = newTaskDraft;
+    addTask(label, details);
+    setNewTaskDraft(null);
+  };
+
   if (loading || !currentList) {
     return <ThemedView style={styles.container} />;
   }
@@ -134,7 +154,7 @@ export default function TaskManagerScreen() {
             onRenameList={renameCurrentList}
           />
 
-          <AddTaskRow onAdd={addTask} />
+          <AddTaskRow onAdd={handleStartAddTask} />
 
           <View style={styles.filterRow}>
             <FilterPills
@@ -229,6 +249,16 @@ export default function TaskManagerScreen() {
         visible={newListVisible}
         onCreate={createList}
         onClose={() => setNewListVisible(false)}
+      />
+
+      <NewTaskModal
+        draft={newTaskDraft}
+        onChange={(patch) => setNewTaskDraft((prev) => (prev ? { ...prev, ...patch } : prev))}
+        statuses={currentList.statuses}
+        customFields={currentList.customFields}
+        allTasks={currentList.tasks}
+        onConfirm={handleConfirmNewTask}
+        onCancel={() => setNewTaskDraft(null)}
       />
 
       <AddCustomFieldModal

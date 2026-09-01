@@ -11,9 +11,9 @@ import {
 
 export function createDefaultStatuses(): StatusDef[] {
   return [
-    { id: 'not_started', label: 'Not started', closed: false, colorIdx: 0, iconIdx: 0 },
-    { id: 'in_progress', label: 'In progress', closed: false, colorIdx: 1, iconIdx: 1 },
-    { id: 'in_review', label: 'In review', closed: false, colorIdx: 2, iconIdx: 2 },
+    { id: 'not_started', label: 'Not started', closed: false, colorIdx: 1, iconIdx: 0 },
+    { id: 'in_progress', label: 'In progress', closed: false, colorIdx: 2, iconIdx: 1 },
+    { id: 'in_review', label: 'In review', closed: false, colorIdx: 6, iconIdx: 2 },
     { id: 'blocked', label: 'Blocked', closed: false, colorIdx: 3, iconIdx: 3 },
     { id: 'completed', label: 'Completed', closed: true, colorIdx: 4, iconIdx: 4 },
     { id: 'cancelled', label: 'Cancelled', closed: true, colorIdx: 5, iconIdx: 5 },
@@ -29,22 +29,29 @@ export function isClosedStatus(statuses: StatusDef[], statusId: string): boolean
 }
 
 /** completedAt/cancelledAt stamps stay tied to the seeded 'completed'/'cancelled' ids. */
+export function statusChangeSideEffects(
+  fromStatus: string,
+  toStatus: string,
+): { completedAt?: number; cancelledAt?: number } {
+  const patch: { completedAt?: number; cancelledAt?: number } = {};
+
+  if (toStatus === 'completed') {
+    patch.completedAt = Date.now();
+  } else if (fromStatus === 'completed') {
+    patch.completedAt = undefined;
+  }
+
+  if (toStatus === 'cancelled') {
+    patch.cancelledAt = Date.now();
+  } else if (fromStatus === 'cancelled') {
+    patch.cancelledAt = undefined;
+  }
+
+  return patch;
+}
+
 export function applyStatusChange(task: Task, status: string): Task {
-  const next: Task = { ...task, status };
-
-  if (status === 'completed') {
-    next.completedAt = Date.now();
-  } else if (task.status === 'completed') {
-    next.completedAt = undefined;
-  }
-
-  if (status === 'cancelled') {
-    next.cancelledAt = Date.now();
-  } else if (task.status === 'cancelled') {
-    next.cancelledAt = undefined;
-  }
-
-  return next;
+  return { ...task, status, ...statusChangeSideEffects(task.status, status) };
 }
 
 export function matchesStatusFilter(task: Task, filter: StatusFilter): boolean {

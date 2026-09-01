@@ -1,17 +1,16 @@
 import { ReactNode, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { ChevronDownIcon } from '@/components/task-manager/chevron-down-icon';
-import { DateField } from '@/components/task-manager/date-field';
-import { DependsOnField } from '@/components/task-manager/depends-on-field';
 import { PaletteIcon } from '@/components/task-manager/palette-icon';
 import { PriorityBadge } from '@/components/task-manager/priority-badge';
+import { TaskDetailsForm } from '@/components/task-manager/task-details-form';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, PillHeight, Spacing } from '@/constants/theme';
 import { useColorPalette, useTheme } from '@/hooks/use-theme';
 import { formatDateTimeLabel } from '@/lib/date-utils';
 import { getStatus } from '@/lib/task-utils';
-import { CustomFieldDef, Priority, StatusDef, Task } from '@/lib/types';
+import { CustomFieldDef, StatusDef, Task } from '@/lib/types';
 
 interface TaskCardProps {
   task: Task;
@@ -25,7 +24,6 @@ interface TaskCardProps {
   onStatusChange: (statusId: string) => void;
 }
 
-const PRIORITY_OPTIONS: Priority[] = [1, 2, 3];
 /** Status colors muted/neutral enough that the task label should stay the default text color. */
 const NEUTRAL_COLOR_IDX = [0, 5];
 
@@ -121,121 +119,14 @@ export function TaskCard({
 
       {expanded && (
         <View style={styles.expandedContent}>
-          <TextInput
-            value={task.label}
-            onChangeText={(label) => onUpdate({ label })}
-            style={[styles.labelInput, { backgroundColor: theme.surface, color: theme.text }]}
-            multiline
+          <TaskDetailsForm
+            draft={task}
+            onChange={onUpdate}
+            statuses={statuses}
+            customFields={customFields}
+            allTasks={allTasks}
+            currentTaskId={task.id}
           />
-
-          <View style={styles.statusButtonsRow}>
-            {statuses.map((s) => (
-              <StatusButton
-                key={s.id}
-                status={s}
-                active={s.id === task.status}
-                onPress={() => onStatusChange(s.id)}
-              />
-            ))}
-          </View>
-
-          <View style={styles.field}>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-              Priority
-            </ThemedText>
-            <View style={styles.priorityRow}>
-              <Pressable
-                onPress={() => onUpdate({ priority: undefined })}
-                style={[
-                  styles.priorityOption,
-                  !task.priority && { borderColor: theme.text },
-                ]}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  None
-                </ThemedText>
-              </Pressable>
-              {PRIORITY_OPTIONS.map((p) => (
-                <Pressable
-                  key={p}
-                  onPress={() => onUpdate({ priority: p })}
-                  style={[
-                    styles.priorityOption,
-                    task.priority === p && { borderColor: theme.text },
-                  ]}>
-                  <PriorityBadge priority={p} />
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          {customFields.map((field) => (
-            <View key={field.id} style={styles.field}>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-                {field.name}
-              </ThemedText>
-              <View style={styles.priorityRow}>
-                <Pressable
-                  onPress={() => onUpdate({ customValues: { ...task.customValues, [field.id]: undefined } })}
-                  style={[
-                    styles.customOption,
-                    !task.customValues?.[field.id] && { borderColor: theme.text },
-                  ]}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    None
-                  </ThemedText>
-                </Pressable>
-                {field.options.map((option) => (
-                  <CustomFieldOptionButton
-                    key={option}
-                    label={option}
-                    tintIdx={field.tintIdx}
-                    active={task.customValues?.[field.id] === option}
-                    onPress={() =>
-                      onUpdate({ customValues: { ...task.customValues, [field.id]: option } })
-                    }
-                  />
-                ))}
-              </View>
-            </View>
-          ))}
-
-          {task.status === 'blocked' && (
-            <View style={styles.field}>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-                What&apos;s blocking it
-              </ThemedText>
-              <TextInput
-                value={task.blockedReason ?? ''}
-                onChangeText={(blockedReason) => onUpdate({ blockedReason })}
-                placeholder="Describe the blocker…"
-                placeholderTextColor={theme.textSecondary}
-                style={[styles.textInput, { backgroundColor: theme.surface, color: theme.text }]}
-                multiline
-              />
-            </View>
-          )}
-
-          <View style={styles.field}>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-              Due Date
-            </ThemedText>
-            <DateField
-              value={task.estimatedDate}
-              onChange={(estimatedDate) => onUpdate({ estimatedDate })}
-            />
-          </View>
-
-          <View style={styles.field}>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.fieldLabel}>
-              Depends on
-            </ThemedText>
-            <DependsOnField
-              tasks={allTasks}
-              currentTaskId={task.id}
-              value={task.dependsOn}
-              onChange={(dependsOn) => onUpdate({ dependsOn })}
-            />
-          </View>
         </View>
       )}
     </View>
@@ -326,66 +217,6 @@ function StatusBadge({
   );
 }
 
-function CustomFieldOptionButton({
-  label,
-  tintIdx,
-  active,
-  onPress,
-}: {
-  label: string;
-  tintIdx: number;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const palette = useColorPalette();
-  const colors = palette[tintIdx];
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.customOption,
-        {
-          backgroundColor: active ? colors.accent : colors.bg,
-          borderColor: colors.border,
-        },
-      ]}>
-      <ThemedText type="small" style={{ color: active ? '#fff' : colors.text, fontWeight: Fonts.semibold }}>
-        {label}
-      </ThemedText>
-    </Pressable>
-  );
-}
-
-function StatusButton({
-  status,
-  active,
-  onPress,
-}: {
-  status: StatusDef;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const palette = useColorPalette();
-  const colors = palette[status.colorIdx];
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.statusButton,
-        { backgroundColor: active ? colors.accent : colors.bg, borderColor: colors.border },
-      ]}>
-      <PaletteIcon iconIdx={status.iconIdx} color={active ? '#fff' : colors.accent} size={14} />
-      <ThemedText
-        type="small"
-        style={[styles.statusButtonText, { color: active ? '#fff' : colors.text }]}>
-        {status.label}
-      </ThemedText>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
@@ -464,64 +295,6 @@ const styles = StyleSheet.create({
   expandedContent: {
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.three,
-    gap: Spacing.three,
-  },
-  labelInput: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 10,
-    fontSize: 14,
-    fontWeight: Fonts.medium,
-  },
-  statusButtonsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.one,
-  },
-  statusButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: Spacing.four,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 5,
-  },
-  statusButtonText: {
-    fontWeight: Fonts.semibold,
-  },
-  priorityRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-    alignItems: 'center',
-  },
-  priorityOption: {
-    borderWidth: 2,
-    borderColor: 'transparent',
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 6,
-  },
-  customOption: {
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 6,
-  },
-  field: {
-    gap: Spacing.one,
-  },
-  fieldLabel: {
-    marginBottom: 2,
-  },
-  textInput: {
-    borderRadius: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 10,
-    fontSize: 14,
-    fontWeight: Fonts.medium,
   },
   quickPickerPanel: {
     position: 'absolute',

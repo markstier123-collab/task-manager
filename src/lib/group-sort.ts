@@ -72,7 +72,7 @@ function groupByDue(tasks: Task[], sortBy: SortByOption, statuses: StatusDef[]):
       key: 'no-date',
       title: 'No due date',
       tasks: sortWithinGroup(withoutDate, sortBy, statuses),
-      collapsible: true,
+      collapsible: false,
     });
   }
   if (closed.length > 0) {
@@ -80,7 +80,7 @@ function groupByDue(tasks: Task[], sortBy: SortByOption, statuses: StatusDef[]):
       key: 'closed',
       title: 'Closed',
       tasks: sortWithinGroup(closed, sortBy, statuses),
-      collapsible: true,
+      collapsible: false,
     });
   }
   return sections;

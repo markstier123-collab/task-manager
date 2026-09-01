@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,6 +9,8 @@ import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTaskManagerContext } from '@/context/task-manager-context';
 import { useTheme } from '@/hooks/use-theme';
 import { GroupByOption, SortByOption } from '@/lib/types';
+
+type SmsTestState = 'idle' | 'sending' | 'success' | 'error';
 
 const SORT_OPTIONS: { value: SortByOption; label: string }[] = [
   { value: 'priority', label: 'Priority' },
@@ -20,6 +23,31 @@ const SORT_OPTIONS: { value: SortByOption; label: string }[] = [
 export default function PreferencesScreen() {
   const { currentList, setGroupBy, setSortBy } = useTaskManagerContext();
   const theme = useTheme();
+  const [smsState, setSmsState] = useState<SmsTestState>('idle');
+  const [smsMessage, setSmsMessage] = useState<string | null>(null);
+
+  const handleSendTestText = async () => {
+    setSmsState('sending');
+    setSmsMessage(null);
+    try {
+      const response = await fetch('/api/send-task-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true }),
+      });
+      const data = await response.json();
+      if (response.ok && data?.success) {
+        setSmsState('success');
+        setSmsMessage('Test text sent!');
+      } else {
+        setSmsState('error');
+        setSmsMessage(data?.error ?? 'Failed to send test text.');
+      }
+    } catch {
+      setSmsState('error');
+      setSmsMessage('Could not reach the server.');
+    }
+  };
 
   if (!currentList) {
     return <ThemedView style={styles.container} />;
@@ -88,6 +116,31 @@ export default function PreferencesScreen() {
               );
             })}
           </View>
+
+          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionHeading}>
+            DAILY TEXT REMINDER
+          </ThemedText>
+          <Pressable
+            onPress={handleSendTestText}
+            disabled={smsState === 'sending'}
+            style={[
+              styles.testButton,
+              { backgroundColor: theme.backgroundElement, opacity: smsState === 'sending' ? 0.6 : 1 },
+            ]}>
+            <ThemedText style={styles.optionText}>
+              {smsState === 'sending' ? 'Sending…' : 'Send test text now'}
+            </ThemedText>
+          </Pressable>
+          {smsMessage && (
+            <ThemedText
+              type="small"
+              style={[
+                styles.smsResult,
+                { color: smsState === 'error' ? '#a32d2d' : '#3b6d11' },
+              ]}>
+              {smsMessage}
+            </ThemedText>
+          )}
         </ThemedView>
       </SafeAreaView>
     </ThemedView>
@@ -147,5 +200,15 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     fontWeight: Fonts.bold,
+  },
+  testButton: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.three,
+    alignItems: 'center',
+  },
+  smsResult: {
+    marginTop: Spacing.two,
+    textAlign: 'center',
   },
 });
