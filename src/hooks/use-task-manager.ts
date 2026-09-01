@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildImportedTasks, ImportTarget } from '@/lib/csv';
 import { generateId } from '@/lib/id';
+import { createSeedList } from '@/lib/seed-data';
 import { loadState, saveState } from '@/lib/storage';
 import { applyStatusChange, createDefaultStatuses } from '@/lib/task-utils';
 import {
@@ -40,8 +41,8 @@ export function useTaskManager() {
       if (stored && stored.lists.length > 0) {
         setState(stored);
       } else {
-        const defaultList = createEmptyList('Tasks');
-        setState({ lists: [defaultList], currentListId: defaultList.id });
+        const seedList = createSeedList();
+        setState({ lists: [seedList], currentListId: seedList.id });
       }
       hasLoaded.current = true;
       setLoading(false);

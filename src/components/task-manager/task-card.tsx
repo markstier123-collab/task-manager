@@ -47,42 +47,32 @@ export function TaskCard({
   const dependsOnTask = task.dependsOn ? allTasks.find((t) => t.id === task.dependsOn) : undefined;
   const isCancelled = task.status === 'cancelled';
 
-  const metaChunks: ReactNode[] = [
-    <ThemedText key="created" themeColor="textSecondary" style={styles.metaText} numberOfLines={1}>
-      Created {formatDateTimeLabel(task.createdAt)}
-    </ThemedText>,
-  ];
+  // "Created" is dropped on narrow screens to keep the collapsed card to 2 lines.
+  const metaParts: { key: string; text: string }[] = [];
+  if (isWide) {
+    metaParts.push({ key: 'created', text: `Created ${formatDateTimeLabel(task.createdAt)}` });
+  }
   if (task.estimatedDate) {
-    metaChunks.push(
-      <ThemedText key="date" themeColor="textSecondary" style={styles.metaText}>
-        · Due {task.estimatedDate}
-      </ThemedText>,
-    );
+    metaParts.push({ key: 'date', text: `Due ${task.estimatedDate}` });
   }
   if (task.status === 'blocked' && task.blockedReason) {
-    metaChunks.push(
-      <ThemedText key="blocked" themeColor="textSecondary" style={styles.metaText} numberOfLines={1}>
-        · Blocked: {task.blockedReason}
-      </ThemedText>,
-    );
+    metaParts.push({ key: 'blocked', text: `Blocked: ${task.blockedReason}` });
   }
   if (dependsOnTask) {
-    metaChunks.push(
-      <ThemedText key="depends" themeColor="textSecondary" style={styles.metaText} numberOfLines={1}>
-        · Depends on: {dependsOnTask.label}
-      </ThemedText>,
-    );
+    metaParts.push({ key: 'depends', text: `Depends on: ${dependsOnTask.label}` });
   }
   for (const field of customFields) {
     const value = task.customValues?.[field.id];
     if (value) {
-      metaChunks.push(
-        <ThemedText key={`cf-${field.id}`} themeColor="textSecondary" style={styles.metaText} numberOfLines={1}>
-          · {field.name}: {value}
-        </ThemedText>,
-      );
+      metaParts.push({ key: `cf-${field.id}`, text: `${field.name}: ${value}` });
     }
   }
+
+  const metaChunks: ReactNode[] = metaParts.map((part, index) => (
+    <ThemedText key={part.key} themeColor="textSecondary" style={styles.metaText} numberOfLines={1}>
+      {index === 0 ? part.text : `· ${part.text}`}
+    </ThemedText>
+  ));
 
   const labelColor =
     !isCancelled && status && !NEUTRAL_COLOR_IDX.includes(status.colorIdx) ? colors.text : undefined;
