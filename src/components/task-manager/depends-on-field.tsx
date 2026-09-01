@@ -26,7 +26,10 @@ export function DependsOnField({ tasks, currentTaskId, value, onChange }: Depend
       <Pressable
         onPress={() => setVisible(true)}
         style={[styles.trigger, { backgroundColor: theme.backgroundElement }]}>
-        <ThemedText numberOfLines={1} style={selectedTask ? undefined : { color: theme.textSecondary }}>
+        <ThemedText
+          type="small"
+          numberOfLines={1}
+          style={selectedTask ? undefined : { color: theme.textSecondary }}>
           {selectedTask ? selectedTask.label : 'None'}
         </ThemedText>
         <ThemedText themeColor="textSecondary">▾</ThemedText>

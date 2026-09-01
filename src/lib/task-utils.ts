@@ -1,34 +1,35 @@
 import { isThisWeek, isToday } from '@/lib/date-utils';
-import { DueFilter, StatusFilter, Task, TaskStatus } from '@/lib/types';
+import {
+  CustomFieldDef,
+  CustomFilterState,
+  DueFilter,
+  PriorityFilter,
+  StatusDef,
+  StatusFilter,
+  Task,
+} from '@/lib/types';
 
-export const STATUS_ORDER: TaskStatus[] = [
-  'not_started',
-  'in_progress',
-  'blocked',
-  'completed',
-  'cancelled',
-];
-
-export const STATUS_LABELS: Record<TaskStatus, string> = {
-  not_started: 'Not started',
-  in_progress: 'In progress',
-  blocked: 'Blocked',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-};
-
-const OPEN_STATUSES: TaskStatus[] = ['not_started', 'in_progress', 'blocked'];
-const CLOSED_STATUSES: TaskStatus[] = ['completed', 'cancelled'];
-
-export function isOpenStatus(status: TaskStatus): boolean {
-  return OPEN_STATUSES.includes(status);
+export function createDefaultStatuses(): StatusDef[] {
+  return [
+    { id: 'not_started', label: 'Not started', closed: false, colorIdx: 0, iconIdx: 0 },
+    { id: 'in_progress', label: 'In progress', closed: false, colorIdx: 1, iconIdx: 1 },
+    { id: 'in_review', label: 'In review', closed: false, colorIdx: 2, iconIdx: 2 },
+    { id: 'blocked', label: 'Blocked', closed: false, colorIdx: 3, iconIdx: 3 },
+    { id: 'completed', label: 'Completed', closed: true, colorIdx: 4, iconIdx: 4 },
+    { id: 'cancelled', label: 'Cancelled', closed: true, colorIdx: 5, iconIdx: 5 },
+  ];
 }
 
-export function isClosedStatus(status: TaskStatus): boolean {
-  return CLOSED_STATUSES.includes(status);
+export function getStatus(statuses: StatusDef[], statusId: string): StatusDef | undefined {
+  return statuses.find((s) => s.id === statusId);
 }
 
-export function applyStatusChange(task: Task, status: TaskStatus): Task {
+export function isClosedStatus(statuses: StatusDef[], statusId: string): boolean {
+  return getStatus(statuses, statusId)?.closed ?? false;
+}
+
+/** completedAt/cancelledAt stamps stay tied to the seeded 'completed'/'cancelled' ids. */
+export function applyStatusChange(task: Task, status: string): Task {
   const next: Task = { ...task, status };
 
   if (status === 'completed') {
@@ -48,8 +49,7 @@ export function applyStatusChange(task: Task, status: TaskStatus): Task {
 
 export function matchesStatusFilter(task: Task, filter: StatusFilter): boolean {
   if (filter === 'all') return true;
-  if (filter === 'open') return isOpenStatus(task.status);
-  return isClosedStatus(task.status);
+  return task.status === filter;
 }
 
 export function matchesDueFilter(task: Task, filter: DueFilter): boolean {
@@ -59,18 +59,36 @@ export function matchesDueFilter(task: Task, filter: DueFilter): boolean {
   return isThisWeek(task.estimatedDate);
 }
 
-export function filterTasks(tasks: Task[], statusFilter: StatusFilter, dueFilter: DueFilter): Task[] {
-  return tasks.filter(
-    (task) => matchesStatusFilter(task, statusFilter) && matchesDueFilter(task, dueFilter),
-  );
+export function matchesPriorityFilter(task: Task, filter: PriorityFilter): boolean {
+  if (filter === 'any') return true;
+  return task.priority === filter;
 }
 
-/** Completed and cancelled tasks always sort to the bottom, in original (createdAt) order otherwise. */
-export function sortTasks(tasks: Task[]): Task[] {
-  return [...tasks].sort((a, b) => {
-    const aClosed = isClosedStatus(a.status);
-    const bClosed = isClosedStatus(b.status);
-    if (aClosed !== bClosed) return aClosed ? 1 : -1;
-    return a.createdAt - b.createdAt;
+export function matchesCustomFilters(
+  task: Task,
+  customFilters: CustomFilterState,
+  customFields: CustomFieldDef[],
+): boolean {
+  return customFields.every((field) => {
+    const active = customFilters[field.id];
+    if (!active || active === 'any') return true;
+    return task.customValues?.[field.id] === active;
   });
+}
+
+export function filterTasks(
+  tasks: Task[],
+  statusFilter: StatusFilter,
+  dueFilter: DueFilter,
+  priorityFilter: PriorityFilter,
+  customFilters: CustomFilterState,
+  customFields: CustomFieldDef[],
+): Task[] {
+  return tasks.filter(
+    (task) =>
+      matchesStatusFilter(task, statusFilter) &&
+      matchesDueFilter(task, dueFilter) &&
+      matchesPriorityFilter(task, priorityFilter) &&
+      matchesCustomFilters(task, customFilters, customFields),
+  );
 }

@@ -1,35 +1,60 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 interface HeaderProps {
   listName: string;
   onOpenDrawer: () => void;
-  onNewList: () => void;
+  onRenameList: (name: string) => void;
 }
 
-export function Header({ listName, onOpenDrawer, onNewList }: HeaderProps) {
+export function Header({ listName, onOpenDrawer, onRenameList }: HeaderProps) {
   const theme = useTheme();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(listName);
+
+  const startEditing = () => {
+    setDraft(listName);
+    setEditing(true);
+  };
+
+  const commit = () => {
+    setEditing(false);
+    onRenameList(draft);
+  };
 
   return (
     <View style={styles.row}>
-      <Pressable onPress={onOpenDrawer} hitSlop={12} style={styles.iconButton}>
+      <Pressable
+        onPress={onOpenDrawer}
+        hitSlop={8}
+        style={[styles.iconButton, { backgroundColor: theme.surface, borderColor: theme.border }]}>
         <HamburgerIcon color={theme.text} />
       </Pressable>
 
       <View style={styles.titleWrap}>
-        <ThemedText type="subtitle" style={styles.title} numberOfLines={1}>
-          {listName} tasks
-        </ThemedText>
+        {editing ? (
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            onBlur={commit}
+            onSubmitEditing={commit}
+            autoFocus
+            selectTextOnFocus
+            returnKeyType="done"
+            style={[styles.title, styles.titleInput, { color: theme.text, borderColor: theme.border }]}
+          />
+        ) : (
+          <Pressable onPress={startEditing}>
+            <ThemedText style={styles.title} numberOfLines={1}>
+              {listName}
+            </ThemedText>
+          </Pressable>
+        )}
       </View>
-
-      <Pressable onPress={onNewList} hitSlop={12} style={styles.newListButton}>
-        <ThemedText type="linkPrimary" style={styles.newListText}>
-          + New list
-        </ThemedText>
-      </Pressable>
     </View>
   );
 }
@@ -51,11 +76,16 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   iconButton: {
-    padding: Spacing.one,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   hamburger: {
-    width: 20,
-    height: 16,
+    width: 18,
+    height: 14,
     justifyContent: 'space-between',
   },
   hamburgerBar: {
@@ -67,14 +97,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: Fonts.bold,
   },
-  newListButton: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.one,
-  },
-  newListText: {
-    fontWeight: '600',
+  titleInput: {
+    borderBottomWidth: 1,
+    paddingVertical: 0,
   },
 });

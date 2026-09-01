@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { useFilterTint, useTheme } from '@/hooks/use-theme';
 
 interface AddTaskRowProps {
@@ -25,9 +25,12 @@ export function AddTaskRow({ onAdd }: AddTaskRowProps) {
       <TextInput
         value={label}
         onChangeText={setLabel}
-        placeholder="Add a task…"
+        placeholder="Add a task"
         placeholderTextColor={theme.textSecondary}
-        style={[styles.input, { backgroundColor: theme.backgroundElement, color: theme.text }]}
+        style={[
+          styles.input,
+          { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+        ]}
         returnKeyType="done"
         onSubmitEditing={submit}
       />
@@ -52,19 +55,22 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: 12,
-    fontSize: 16,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    fontSize: 15,
   },
   button: {
-    borderRadius: Spacing.three,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 10,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 12,
   },
   buttonText: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: Fonts.semibold,
     fontSize: 14,
   },
 });

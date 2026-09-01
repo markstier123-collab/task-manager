@@ -6,39 +6,55 @@ import { ThemedText } from '@/components/themed-text';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useFilterTint, useTheme } from '@/hooks/use-theme';
 
-interface NewListModalProps {
+interface AddCustomFieldModalProps {
   visible: boolean;
-  onCreate: (name: string) => void;
+  onCreate: (name: string, options: string[]) => void;
   onClose: () => void;
 }
 
-export function NewListModal({ visible, onCreate, onClose }: NewListModalProps) {
+export function AddCustomFieldModal({ visible, onCreate, onClose }: AddCustomFieldModalProps) {
   const [name, setName] = useState('');
+  const [optionsText, setOptionsText] = useState('');
   const theme = useTheme();
   const tint = useFilterTint();
 
   const handleClose = () => {
     setName('');
+    setOptionsText('');
     onClose();
   };
 
+  const options = optionsText
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const canSubmit = name.trim().length > 0 && options.length > 0;
+
   const submit = () => {
-    if (!name.trim()) return;
-    onCreate(name.trim());
+    if (!canSubmit) return;
+    onCreate(name.trim(), options);
     handleClose();
   };
 
   return (
     <ModalSheet visible={visible} onClose={handleClose}>
       <ThemedText type="subtitle" style={styles.title}>
-        New task list
+        New filter group
       </ThemedText>
       <TextInput
         value={name}
         onChangeText={setName}
-        placeholder="List name"
+        placeholder="Field name (e.g. Type)"
         placeholderTextColor={theme.textSecondary}
         autoFocus
+        style={[styles.input, { backgroundColor: theme.backgroundElement, color: theme.text }]}
+        returnKeyType="next"
+      />
+      <TextInput
+        value={optionsText}
+        onChangeText={setOptionsText}
+        placeholder="Options, comma separated (e.g. Bug, Feature, Chore)"
+        placeholderTextColor={theme.textSecondary}
         style={[styles.input, { backgroundColor: theme.backgroundElement, color: theme.text }]}
         returnKeyType="done"
         onSubmitEditing={submit}
@@ -51,10 +67,10 @@ export function NewListModal({ visible, onCreate, onClose }: NewListModalProps) 
         </Pressable>
         <Pressable
           onPress={submit}
-          disabled={!name.trim()}
+          disabled={!canSubmit}
           style={[
             styles.createButton,
-            { backgroundColor: tint.blue.solidBg, opacity: name.trim() ? 1 : 0.5 },
+            { backgroundColor: tint.blue.solidBg, opacity: canSubmit ? 1 : 0.5 },
           ]}>
           <ThemedText style={[styles.buttonLabel, { color: '#fff' }]}>Create</ThemedText>
         </Pressable>

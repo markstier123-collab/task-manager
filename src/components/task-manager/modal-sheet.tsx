@@ -27,7 +27,7 @@ export function ModalSheet({ visible, onClose, children, align = 'center' }: Mod
             align === 'left'
               ? [styles.leftPanel, { paddingTop: insets.top + Spacing.four }]
               : styles.centerPanel,
-            { backgroundColor: theme.background, borderColor: theme.backgroundSelected },
+            { backgroundColor: theme.surface, borderColor: theme.border },
           ]}>
           {children}
         </Pressable>

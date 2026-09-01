@@ -50,6 +50,21 @@ export function formatDateLabel(isoDate: string): string {
   return `${MONTH_NAMES_SHORT[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
+/** Short form without year, e.g. "Aug 30" — used for group section headers. */
+export function formatDateShort(isoDate: string): string {
+  const date = parseISODate(isoDate);
+  return `${MONTH_NAMES_SHORT[date.getMonth()]} ${date.getDate()}`;
+}
+
+/** e.g. "Aug 29, 4:59 PM" — used for the "Created" meta chunk on a task card. */
+export function formatDateTimeLabel(timestampMs: number): string {
+  const date = new Date(timestampMs);
+  const hours24 = date.getHours();
+  const hours = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  const meridiem = hours24 < 12 ? 'AM' : 'PM';
+  return `${MONTH_NAMES_SHORT[date.getMonth()]} ${date.getDate()}, ${hours}:${pad(date.getMinutes())} ${meridiem}`;
+}
+
 export const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export function getMonthLabel(year: number, month: number): string {

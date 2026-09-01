@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ModalSheet } from '@/components/task-manager/modal-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
 import { useFilterTint, useTheme } from '@/hooks/use-theme';
 import {
   formatDateLabel,
@@ -27,7 +27,14 @@ export function DateField({ value, onChange }: DateFieldProps) {
   const theme = useTheme();
   const tint = useFilterTint();
 
+  const nextMonth = viewMonth === 11 ? 0 : viewMonth + 1;
+  const nextMonthYear = viewMonth === 11 ? viewYear + 1 : viewYear;
+
   const weeks = useMemo(() => getMonthGrid(viewYear, viewMonth), [viewYear, viewMonth]);
+  const nextWeeks = useMemo(
+    () => getMonthGrid(nextMonthYear, nextMonth),
+    [nextMonthYear, nextMonth],
+  );
 
   const open = () => {
     const base = value ? parseISODate(value) : new Date();
@@ -50,12 +57,17 @@ export function DateField({ value, onChange }: DateFieldProps) {
     setViewYear(year);
   };
 
+  const selectDay = (iso: string) => {
+    onChange(iso);
+    setVisible(false);
+  };
+
   return (
     <View>
       <Pressable
         onPress={open}
         style={[styles.trigger, { backgroundColor: theme.backgroundElement }]}>
-        <ThemedText style={value ? undefined : { color: theme.textSecondary }}>
+        <ThemedText type="small" style={value ? undefined : { color: theme.textSecondary }}>
           {value ? formatDateLabel(value) : 'Set date'}
         </ThemedText>
       </Pressable>
@@ -65,46 +77,33 @@ export function DateField({ value, onChange }: DateFieldProps) {
           <Pressable onPress={() => changeMonth(-1)} hitSlop={8} style={styles.navButton}>
             <ThemedText style={styles.navArrow}>‹</ThemedText>
           </Pressable>
-          <ThemedText type="smallBold">{getMonthLabel(viewYear, viewMonth)}</ThemedText>
+          <ThemedText type="smallBold">
+            {getMonthLabel(viewYear, viewMonth)} – {getMonthLabel(nextMonthYear, nextMonth)}
+          </ThemedText>
           <Pressable onPress={() => changeMonth(1)} hitSlop={8} style={styles.navButton}>
             <ThemedText style={styles.navArrow}>›</ThemedText>
           </Pressable>
         </View>
 
-        <View style={styles.weekdayRow}>
-          {WEEKDAY_LABELS.map((label, i) => (
-            <ThemedText key={i} type="small" themeColor="textSecondary" style={styles.weekdayCell}>
-              {label}
-            </ThemedText>
-          ))}
-        </View>
-
-        {weeks.map((week, weekIndex) => (
-          <View key={weekIndex} style={styles.weekRow}>
-            {week.map((day, dayIndex) => {
-              if (!day) return <View key={dayIndex} style={styles.dayCell} />;
-              const iso = toISODate(day);
-              const selected = iso === value;
-              return (
-                <Pressable
-                  key={dayIndex}
-                  onPress={() => {
-                    onChange(iso);
-                    setVisible(false);
-                  }}
-                  style={[
-                    styles.dayCell,
-                    styles.dayCellButton,
-                    selected && { backgroundColor: tint.blue.solidBg },
-                  ]}>
-                  <ThemedText style={selected ? styles.selectedDayText : undefined}>
-                    {day.getDate()}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
-          </View>
-        ))}
+        <ScrollView style={styles.monthsScroll} showsVerticalScrollIndicator={false}>
+          <MonthGrid
+            year={viewYear}
+            month={viewMonth}
+            weeks={weeks}
+            value={value}
+            tint={tint}
+            onSelectDay={selectDay}
+          />
+          <MonthGrid
+            year={nextMonthYear}
+            month={nextMonth}
+            weeks={nextWeeks}
+            value={value}
+            tint={tint}
+            onSelectDay={selectDay}
+            style={styles.secondMonth}
+          />
+        </ScrollView>
 
         {value && (
           <Pressable
@@ -119,6 +118,68 @@ export function DateField({ value, onChange }: DateFieldProps) {
           </Pressable>
         )}
       </ModalSheet>
+    </View>
+  );
+}
+
+interface MonthGridTint {
+  blue: { solidBg: string };
+}
+
+function MonthGrid({
+  year,
+  month,
+  weeks,
+  value,
+  tint,
+  onSelectDay,
+  style,
+}: {
+  year: number;
+  month: number;
+  weeks: (Date | null)[][];
+  value?: string;
+  tint: MonthGridTint;
+  onSelectDay: (iso: string) => void;
+  style?: object;
+}) {
+  return (
+    <View style={style}>
+      <ThemedText type="smallBold" themeColor="textSecondary" style={styles.monthLabel}>
+        {getMonthLabel(year, month)}
+      </ThemedText>
+
+      <View style={styles.weekdayRow}>
+        {WEEKDAY_LABELS.map((label, i) => (
+          <ThemedText key={i} type="small" themeColor="textSecondary" style={styles.weekdayCell}>
+            {label}
+          </ThemedText>
+        ))}
+      </View>
+
+      {weeks.map((week, weekIndex) => (
+        <View key={weekIndex} style={styles.weekRow}>
+          {week.map((day, dayIndex) => {
+            if (!day) return <View key={dayIndex} style={styles.dayCell} />;
+            const iso = toISODate(day);
+            const selected = iso === value;
+            return (
+              <Pressable
+                key={dayIndex}
+                onPress={() => onSelectDay(iso)}
+                style={[
+                  styles.dayCell,
+                  styles.dayCellButton,
+                  selected && { backgroundColor: tint.blue.solidBg },
+                ]}>
+                <ThemedText style={selected ? styles.selectedDayText : undefined}>
+                  {day.getDate()}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
     </View>
   );
 }
@@ -144,7 +205,16 @@ const styles = StyleSheet.create({
   },
   navArrow: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: Fonts.semibold,
+  },
+  monthsScroll: {
+    maxHeight: 480,
+  },
+  monthLabel: {
+    marginBottom: Spacing.two,
+  },
+  secondMonth: {
+    marginTop: Spacing.four,
   },
   weekdayRow: {
     flexDirection: 'row',
@@ -168,7 +238,7 @@ const styles = StyleSheet.create({
   },
   selectedDayText: {
     color: '#fff',
-    fontWeight: '700',
+    fontWeight: Fonts.bold,
   },
   clearButton: {
     marginTop: Spacing.two,
