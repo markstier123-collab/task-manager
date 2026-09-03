@@ -1,25 +1,49 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { ModalSheet } from '@/components/task-manager/modal-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { Task } from '@/lib/types';
+import { isClosedStatus } from '@/lib/task-utils';
+import { StatusDef, Task } from '@/lib/types';
 
 interface DependsOnFieldProps {
   tasks: Task[];
+  statuses: StatusDef[];
   currentTaskId: string;
   value?: string;
   onChange: (taskId: string | undefined) => void;
 }
 
-export function DependsOnField({ tasks, currentTaskId, value, onChange }: DependsOnFieldProps) {
+function compareByDueDate(a: Task, b: Task): number {
+  if (a.estimatedDate && b.estimatedDate) {
+    return a.estimatedDate < b.estimatedDate ? -1 : a.estimatedDate > b.estimatedDate ? 1 : 0;
+  }
+  if (a.estimatedDate) return -1;
+  if (b.estimatedDate) return 1;
+  return a.createdAt - b.createdAt;
+}
+
+export function DependsOnField({ tasks, statuses, currentTaskId, value, onChange }: DependsOnFieldProps) {
   const [visible, setVisible] = useState(false);
+  const [query, setQuery] = useState('');
   const theme = useTheme();
 
-  const options = tasks.filter((task) => task.id !== currentTaskId);
-  const selectedTask = options.find((task) => task.id === value);
+  const openOptions = tasks
+    .filter((task) => task.id !== currentTaskId && !isClosedStatus(statuses, task.status))
+    .sort(compareByDueDate);
+  const selectedTask = tasks.find((task) => task.id === value);
+
+  const trimmedQuery = query.trim().toLowerCase();
+  const options = trimmedQuery
+    ? openOptions.filter((task) => task.label.toLowerCase().includes(trimmedQuery))
+    : openOptions;
+
+  const close = () => {
+    setVisible(false);
+    setQuery('');
+  };
 
   return (
     <View>
@@ -35,15 +59,32 @@ export function DependsOnField({ tasks, currentTaskId, value, onChange }: Depend
         <ThemedText themeColor="textSecondary">▾</ThemedText>
       </Pressable>
 
-      <ModalSheet visible={visible} onClose={() => setVisible(false)}>
-        <ThemedText type="smallBold" themeColor="textSecondary" style={styles.heading}>
-          DEPENDS ON
-        </ThemedText>
+      <ModalSheet visible={visible} onClose={close}>
+        <View style={styles.headingRow}>
+          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.headingText}>
+            DEPENDS ON
+          </ThemedText>
+          <Pressable onPress={close} hitSlop={8} style={styles.closeButton}>
+            <ThemedText themeColor="textSecondary" style={styles.closeButtonText}>
+              ✕
+            </ThemedText>
+          </Pressable>
+        </View>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Type to search"
+          placeholderTextColor={theme.textSecondary}
+          style={[
+            styles.searchInput,
+            { backgroundColor: theme.backgroundElement, color: theme.text },
+          ]}
+        />
         <ScrollView style={styles.list}>
           <Pressable
             onPress={() => {
               onChange(undefined);
-              setVisible(false);
+              close();
             }}
             style={[styles.option, !value && { backgroundColor: theme.backgroundSelected }]}>
             <ThemedText themeColor="textSecondary">None</ThemedText>
@@ -53,7 +94,7 @@ export function DependsOnField({ tasks, currentTaskId, value, onChange }: Depend
               key={task.id}
               onPress={() => {
                 onChange(task.id);
-                setVisible(false);
+                close();
               }}
               style={[
                 styles.option,
@@ -64,7 +105,9 @@ export function DependsOnField({ tasks, currentTaskId, value, onChange }: Depend
           ))}
           {options.length === 0 && (
             <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
-              No other tasks in this list yet.
+              {openOptions.length === 0
+                ? 'No other open tasks in this list yet.'
+                : 'No matching tasks.'}
             </ThemedText>
           )}
         </ScrollView>
@@ -83,8 +126,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: 10,
   },
-  heading: {
+  headingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.two,
+  },
+  headingText: {
     letterSpacing: 0.5,
+  },
+  closeButton: {
+    padding: 2,
+  },
+  closeButtonText: {
+    fontSize: 15,
+  },
+  searchInput: {
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 8,
+    fontSize: 14,
     marginBottom: Spacing.two,
   },
   list: {

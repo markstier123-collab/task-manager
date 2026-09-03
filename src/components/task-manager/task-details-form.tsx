@@ -152,6 +152,7 @@ export function TaskDetailsForm({
         </ThemedText>
         <DependsOnField
           tasks={allTasks}
+          statuses={statuses}
           currentTaskId={currentTaskId}
           value={draft.dependsOn}
           onChange={(dependsOn) => onChange({ dependsOn })}

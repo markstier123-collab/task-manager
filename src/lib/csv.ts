@@ -1,6 +1,6 @@
 import { generateId } from '@/lib/id';
 import { toISODate } from '@/lib/date-utils';
-import { getStatus } from '@/lib/task-utils';
+import { getClosedAt, getStatus } from '@/lib/task-utils';
 import { CustomFieldDef, Priority, StatusDef, Task } from '@/lib/types';
 
 export function parseCsv(text: string): string[][] {
@@ -80,6 +80,7 @@ const BUILTIN_COLUMN_NAMES = [
   'Estimated Date',
   'Blocked Reason',
   'Depends On',
+  'Closed At',
 ] as const;
 
 export function tasksToCsv(tasks: Task[], customFields: CustomFieldDef[], statuses: StatusDef[]): string {
@@ -87,6 +88,7 @@ export function tasksToCsv(tasks: Task[], customFields: CustomFieldDef[], status
   const rows = tasks.map((task) => {
     const status = getStatus(statuses, task.status);
     const dependsOnTask = task.dependsOn ? tasks.find((t) => t.id === task.dependsOn) : undefined;
+    const closedAt = getClosedAt(task);
     const base = [
       task.label,
       status?.label ?? '',
@@ -95,6 +97,7 @@ export function tasksToCsv(tasks: Task[], customFields: CustomFieldDef[], status
       task.estimatedDate ?? '',
       task.blockedReason ?? '',
       dependsOnTask?.label ?? '',
+      closedAt ? new Date(closedAt).toISOString() : '',
     ];
     const customVals = customFields.map((f) => task.customValues?.[f.id] ?? '');
     return [...base, ...customVals];
@@ -122,6 +125,10 @@ const BUILTIN_TARGET_ALIASES: Record<string, ImportTarget> = {
   blockedreason: 'blockedReason',
   'depends on': 'dependsOn',
   dependson: 'dependsOn',
+  'closed at': 'closedAt',
+  closedat: 'closedAt',
+  'completed at': 'closedAt',
+  completedat: 'closedAt',
 };
 
 export function guessImportTarget(columnName: string, customFields: CustomFieldDef[]): ImportTarget {
@@ -144,6 +151,7 @@ export function importTargetOptions(
     { value: 'estimatedDate', label: 'Estimated Date' },
     { value: 'blockedReason', label: 'Blocked Reason' },
     { value: 'dependsOn', label: 'Depends On' },
+    { value: 'closedAt', label: 'Closed At' },
     ...customFields.map((f) => ({ value: `custom:${f.id}`, label: f.name })),
   ];
 }
@@ -213,6 +221,16 @@ export function buildImportedTasks(
     const blockedReason = getValue('blockedReason') || undefined;
     const dependsOnLabel = getValue('dependsOn') || undefined;
 
+    // Only meaningful for a closed status — an open task has no completion/cancellation date.
+    const closedAtRaw = getValue('closedAt');
+    const parsedClosedAt = closedAtRaw ? Date.parse(closedAtRaw) : NaN;
+    let completedAt: number | undefined;
+    let cancelledAt: number | undefined;
+    if (!Number.isNaN(parsedClosedAt) && status.closed) {
+      if (status.id === 'cancelled') cancelledAt = parsedClosedAt;
+      else completedAt = parsedClosedAt;
+    }
+
     const customValues: Record<string, string> = {};
     for (const field of customFields) {
       const raw = getValue(`custom:${field.id}`);
@@ -234,6 +252,8 @@ export function buildImportedTasks(
       estimatedDate,
       blockedReason,
       priority,
+      completedAt,
+      cancelledAt,
       customValues: Object.keys(customValues).length > 0 ? customValues : undefined,
     };
     newTasks.push(task);
