@@ -1,5 +1,5 @@
 import { formatDateShort, isToday } from '@/lib/date-utils';
-import { isClosedStatus } from '@/lib/task-utils';
+import { getClosedAt, isClosedStatus } from '@/lib/task-utils';
 import { CustomFieldDef, GroupByOption, SortByOption, StatusDef, Task } from '@/lib/types';
 
 export interface TaskSection {
@@ -44,6 +44,11 @@ function sortWithinGroup(tasks: Task[], sortBy: SortByOption, statuses: StatusDe
   );
 }
 
+/** The "Closed" section always sorts by completion/cancellation date, most recent first — independent of the list's sortBy preference. */
+function sortClosedGroup(tasks: Task[]): Task[] {
+  return [...tasks].sort((a, b) => (getClosedAt(b) ?? 0) - (getClosedAt(a) ?? 0));
+}
+
 function groupByDue(tasks: Task[], sortBy: SortByOption, statuses: StatusDef[]): TaskSection[] {
   const closed = tasks.filter((t) => isClosedStatus(statuses, t.status));
   const open = tasks.filter((t) => !isClosedStatus(statuses, t.status));
@@ -79,7 +84,7 @@ function groupByDue(tasks: Task[], sortBy: SortByOption, statuses: StatusDef[]):
     sections.push({
       key: 'closed',
       title: 'Closed',
-      tasks: sortWithinGroup(closed, sortBy, statuses),
+      tasks: sortClosedGroup(closed),
       collapsible: false,
     });
   }

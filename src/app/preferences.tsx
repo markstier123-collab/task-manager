@@ -128,7 +128,7 @@ export default function PreferencesScreen() {
               { backgroundColor: theme.backgroundElement, opacity: smsState === 'sending' ? 0.6 : 1 },
             ]}>
             <ThemedText style={styles.optionText}>
-              {smsState === 'sending' ? 'Sending…' : 'Send test text now'}
+              {smsState === 'sending' ? 'Sending…' : 'Send test text message now'}
             </ThemedText>
           </Pressable>
           {smsMessage && (

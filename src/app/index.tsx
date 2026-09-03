@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Pressable, SectionList, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, SectionList, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AddCustomFieldModal } from '@/components/task-manager/add-custom-field-modal';
 import { AddTaskRow } from '@/components/task-manager/add-task-row';
 import { CustomFilterDropdown } from '@/components/task-manager/custom-filter-dropdown';
+import { FilterDropdown } from '@/components/task-manager/filter-dropdown';
 import { FilterPills } from '@/components/task-manager/filter-pills';
 import { Header } from '@/components/task-manager/header';
 import { ImportModal } from '@/components/task-manager/import-modal';
@@ -30,8 +31,15 @@ import { parseCsv, tasksToCsv } from '@/lib/csv';
 import { todayISODate } from '@/lib/date-utils';
 import { downloadCsv, pickCsvFileText } from '@/lib/file-io';
 import { groupTasks } from '@/lib/group-sort';
-import { filterTasks } from '@/lib/task-utils';
-import { CustomFilterState, DueFilter, PriorityFilter, StatusFilter } from '@/lib/types';
+import { filterTasks, matchesClosedFilter } from '@/lib/task-utils';
+import { ClosedFilter, CustomFilterState, DueFilter, PriorityFilter, StatusFilter } from '@/lib/types';
+
+const CLOSED_FILTER_OPTIONS: { value: ClosedFilter; label: string }[] = [
+  { value: 'anytime', label: 'Anytime' },
+  { value: 'today', label: 'Today' },
+  { value: 'past_week', label: 'Past Week' },
+  { value: 'past_month', label: 'Past Month' },
+];
 
 export default function TaskManagerScreen() {
   const {
@@ -60,6 +68,8 @@ export default function TaskManagerScreen() {
   const [dueFilter, setDueFilter] = useState<DueFilter>('anytime');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('any');
   const [customFilters, setCustomFilters] = useState<CustomFilterState>({});
+  const [closedFilter, setClosedFilter] = useState<ClosedFilter>('anytime');
+  const [searchQuery, setSearchQuery] = useState('');
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
@@ -85,15 +95,21 @@ export default function TaskManagerScreen() {
       priorityFilter,
       customFilters,
       currentList.customFields,
+      searchQuery,
     );
-    return groupTasks(
+    const grouped = groupTasks(
       filtered,
       currentList.groupBy,
       currentList.sortBy,
       currentList.statuses,
       currentList.customFields,
     );
-  }, [currentList, effectiveStatusFilter, dueFilter, priorityFilter, customFilters]);
+    return grouped.map((section) =>
+      section.key === 'closed'
+        ? { ...section, tasks: section.tasks.filter((task) => matchesClosedFilter(task, closedFilter)) }
+        : section,
+    );
+  }, [currentList, effectiveStatusFilter, dueFilter, priorityFilter, customFilters, searchQuery, closedFilter]);
 
   const toggleSection = (key: string) => {
     setCollapsedSections((prev) => {
@@ -188,6 +204,16 @@ export default function TaskManagerScreen() {
                 + Add filter group
               </ThemedText>
             </Pressable>
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Type to search"
+              placeholderTextColor={theme.textSecondary}
+              style={[
+                styles.searchInput,
+                { backgroundColor: theme.surface, borderColor: theme.border, color: theme.text },
+              ]}
+            />
           </View>
 
           <SectionList
@@ -204,22 +230,27 @@ export default function TaskManagerScreen() {
                 collapsible={section.collapsible}
                 collapsed={collapsedSections.has(section.key)}
                 onToggle={() => toggleSection(section.key)}
+                isClosedSection={section.key === 'closed'}
+                closedFilter={closedFilter}
+                onClosedFilterChange={setClosedFilter}
               />
             )}
-            renderItem={({ item }) => (
-              <TaskCard
-                task={item}
-                allTasks={currentList.tasks}
-                statuses={currentList.statuses}
-                customFields={currentList.customFields}
-                expanded={expandedTaskId === item.id}
-                isWide={isWide}
-                onToggleExpand={() =>
-                  setExpandedTaskId((prev) => (prev === item.id ? null : item.id))
-                }
-                onUpdate={(patch) => updateTask(item.id, patch)}
-                onStatusChange={(status) => setTaskStatus(item.id, status)}
-              />
+            renderItem={({ item, index, section }) => (
+              <View style={section.key === 'closed' && index === 0 ? styles.closedFirstItemOffset : undefined}>
+                <TaskCard
+                  task={item}
+                  allTasks={currentList.tasks}
+                  statuses={currentList.statuses}
+                  customFields={currentList.customFields}
+                  expanded={expandedTaskId === item.id}
+                  isWide={isWide}
+                  onToggleExpand={() =>
+                    setExpandedTaskId((prev) => (prev === item.id ? null : item.id))
+                  }
+                  onUpdate={(patch) => updateTask(item.id, patch)}
+                  onStatusChange={(status) => setTaskStatus(item.id, status)}
+                />
+              </View>
             )}
             ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
             SectionSeparatorComponent={() => <View style={styles.sectionSeparator} />}
@@ -305,12 +336,18 @@ function SectionHeader({
   collapsible,
   collapsed,
   onToggle,
+  isClosedSection,
+  closedFilter,
+  onClosedFilterChange,
 }: {
   title: string;
   count: number;
   collapsible: boolean;
   collapsed: boolean;
   onToggle: () => void;
+  isClosedSection: boolean;
+  closedFilter: ClosedFilter;
+  onClosedFilterChange: (filter: ClosedFilter) => void;
 }) {
   const theme = useTheme();
 
@@ -319,6 +356,15 @@ function SectionHeader({
       <ThemedText themeColor="textSecondary" style={styles.sectionTitle} numberOfLines={1}>
         {title}
       </ThemedText>
+      {isClosedSection && (
+        <FilterDropdown
+          label="Closed"
+          options={CLOSED_FILTER_OPTIONS}
+          value={closedFilter}
+          onChange={(value) => onClosedFilterChange(value as ClosedFilter)}
+        />
+      )}
+      <View style={styles.sectionSpacer} />
       <ThemedText themeColor="textSecondary" style={styles.sectionCount}>
         ({count})
       </ThemedText>
@@ -327,7 +373,12 @@ function SectionHeader({
           {collapsed ? '▴' : '▾'}
         </ThemedText>
       )}
-      <View style={[styles.sectionDivider, { backgroundColor: theme.border }]} />
+      <View
+        style={[
+          styles.sectionDivider,
+          { backgroundColor: theme.border, transform: [{ translateY: isClosedSection ? 0 : -7 }] },
+        ]}
+      />
     </View>
   );
 
@@ -371,6 +422,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 14,
   },
+  searchInput: {
+    marginLeft: 'auto',
+    height: PillHeight,
+    minWidth: 160,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    fontSize: 11,
+    fontWeight: Fonts.medium,
+  },
   list: {
     flex: 1,
   },
@@ -379,6 +440,10 @@ const styles = StyleSheet.create({
   },
   itemSeparator: {
     height: Spacing.two,
+  },
+  // Compensates for the Closed section's divider sitting 7px lower than other sections' dividers.
+  closedFirstItemOffset: {
+    marginTop: 7,
   },
   sectionSeparator: {
     height: Spacing.one,
@@ -396,12 +461,14 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: 1,
-    transform: [{ translateY: -7 }],
   },
   sectionTitle: {
-    flex: 1,
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: Fonts.semibold,
+  },
+  sectionSpacer: {
+    flex: 1,
   },
   sectionCount: {
     fontSize: 12,

@@ -1,5 +1,6 @@
 import { isThisWeek, isToday } from '@/lib/date-utils';
 import {
+  ClosedFilter,
   CustomFieldDef,
   CustomFilterState,
   DueFilter,
@@ -8,6 +9,8 @@ import {
   StatusFilter,
   Task,
 } from '@/lib/types';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function createDefaultStatuses(): StatusDef[] {
   return [
@@ -83,6 +86,36 @@ export function matchesCustomFilters(
   });
 }
 
+/** When a task was closed, for sorting/filtering the "Closed" section. Undefined for still-open tasks or a custom closed status that was never stamped. */
+export function getClosedAt(task: Task): number | undefined {
+  return task.completedAt ?? task.cancelledAt;
+}
+
+export function matchesClosedFilter(task: Task, filter: ClosedFilter): boolean {
+  if (filter === 'anytime') return true;
+  const closedAt = getClosedAt(task);
+  if (!closedAt) return false;
+
+  if (filter === 'today') {
+    const closedDate = new Date(closedAt);
+    const now = new Date();
+    return (
+      closedDate.getFullYear() === now.getFullYear() &&
+      closedDate.getMonth() === now.getMonth() &&
+      closedDate.getDate() === now.getDate()
+    );
+  }
+
+  const days = filter === 'past_week' ? 7 : 30;
+  return closedAt >= Date.now() - days * DAY_MS;
+}
+
+export function matchesSearchQuery(task: Task, query: string): boolean {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return true;
+  return task.label.toLowerCase().includes(trimmed);
+}
+
 export function filterTasks(
   tasks: Task[],
   statusFilter: StatusFilter,
@@ -90,12 +123,14 @@ export function filterTasks(
   priorityFilter: PriorityFilter,
   customFilters: CustomFilterState,
   customFields: CustomFieldDef[],
+  searchQuery: string,
 ): Task[] {
   return tasks.filter(
     (task) =>
       matchesStatusFilter(task, statusFilter) &&
       matchesDueFilter(task, dueFilter) &&
       matchesPriorityFilter(task, priorityFilter) &&
-      matchesCustomFilters(task, customFilters, customFields),
+      matchesCustomFilters(task, customFilters, customFields) &&
+      matchesSearchQuery(task, searchQuery),
   );
 }

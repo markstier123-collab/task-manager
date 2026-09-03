@@ -52,5 +52,7 @@ export interface TaskManagerState {
 export type StatusFilter = string;
 export type DueFilter = 'anytime' | 'today' | 'this_week';
 export type PriorityFilter = 'any' | Priority;
+/** How far back to show closed tasks in the "Closed" section, by their completed/cancelled date. */
+export type ClosedFilter = 'anytime' | 'today' | 'past_week' | 'past_month';
 /** Maps a custom field's id to its active filter value, or 'any'. */
 export type CustomFilterState = Record<string, string>;

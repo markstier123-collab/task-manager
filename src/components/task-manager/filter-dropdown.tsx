@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ChevronDownIcon } from '@/components/task-manager/chevron-down-icon';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, PillHeight, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { getDropdownTop } from '@/lib/dropdown-position';
 
 interface FilterDropdownProps {
   label: string;
@@ -24,6 +25,7 @@ export function FilterDropdown({ label, options, value, onChange }: FilterDropdo
   const anchorRef = useRef<View>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const theme = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const selectedLabel = options.find((o) => o.value === value)?.label ?? value;
 
   const open = () => {
@@ -50,7 +52,7 @@ export function FilterDropdown({ label, options, value, onChange }: FilterDropdo
               style={[
                 styles.panel,
                 {
-                  top: anchor.y + anchor.height + 4,
+                  top: getDropdownTop(anchor.y, anchor.height, options.length, windowHeight),
                   left: anchor.x,
                   backgroundColor: theme.surface,
                   borderColor: theme.border,
